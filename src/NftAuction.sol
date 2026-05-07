@@ -137,31 +137,22 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         // 起拍价必须大于0
         require(_startPrice > 0, "start price invalid");
         // 业务设置允许推迟拍卖，为0表示立即开始，上限是24小时后开启拍卖
-        require(
-            _delayHours >= 0 && _delayHours <= 24 * 1 hours,
-            "_delayHours invalid"
-        );
+        require(_delayHours <= 24,"_delayHours invalid");
         // 拍卖持续时间为1-24小时
-        require(
-            _durationHours >= 1 * 1 hours && _durationHours <= 24 * 1 hours,
-            "_durationHours invalid"
-        );
+        require(_durationHours >= 1 && _durationHours <= 24,"_durationHours invalid");
         IERC721 nft = IERC721(_nftContract);
         // 校验这个nft是否已经上架
         uint256 existingId = nftToken2AuctionId[_nftContract][_tokenId];
         // 已上架过的NFT不能再次拍卖
         require(existingId == 0, "NFT already in auction");
         // 校验nft是调用者的
-        require(
-            nft.ownerOf(_tokenId) == msg.sender,
-            "you are not the owner of this nft"
-        );
+        require(nft.ownerOf(_tokenId) == msg.sender,"you are not the owner of this nft");
         // 校验该NFT是否已经授权给了本合约
         require(
             nft.getApproved(_tokenId) == address(this) || nft.isApprovedForAll(msg.sender, address(this)),
             "Marketplace not approved"
         );
-        uint256 _startTime = block.timestamp + _delayHours;
+        uint256 _startTime = block.timestamp + (_delayHours * 1 hours);
         // 创建拍卖
         uint256 auctionId = nextAuctionId++;
         // 转移nft到合约
@@ -350,6 +341,8 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         require(auction.currentStatus == Status.Pending, "Must be Pending");
         // 必须在开始时间之前
         require(block.timestamp < auction.startTime, "Already started");
+        // 清理映射
+        delete nftToken2AuctionId[auction.nftContract][auction.tokenId];
         // 更新状态
         auction.currentStatus = Status.Cancelled;
         // 退回NFT
