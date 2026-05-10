@@ -5,7 +5,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MyNft is ERC721,ERC721URIStorage,Ownable{
+contract MockMyNft is ERC721,ERC721URIStorage,Ownable{
 
     // Token ID计数器
     uint256 private _tokenIdCounter;
