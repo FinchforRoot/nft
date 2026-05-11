@@ -12,29 +12,27 @@ contract MockAggregator is AggregatorV3Interface {
         answer = _answer;
     }
 
-    function decimals() external view override returns (uint8){
+    function decimals() external pure override returns (uint8){
         return 8;
     }
 
-    function description() external view override returns (string memory){
+    function description() external pure override returns (string memory){
         return "a test price feeder";
     }
 
-    function version() external view override returns (uint256){
+    function version() external pure override returns (uint256){
         return 0;
     }
 
-    function getRoundData(
-        uint80 _roundId
-    ) external view override returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
-        return (0, answer, 0, 0, 0);
+    function getRoundData(uint80) external pure override returns (uint80 roundId, int256 _answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
+        return (0, _answer, 0, 0, 0);
     }
 
     function latestRoundData()
     external
-    view
-    override returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
-        return (0, answer, 0, 0, 0);
+    pure
+    override returns (uint80 roundId, int256 _answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
+        return (0, _answer, 0, 0, 0);
     }
 
     function setPrice(int256 _answer) public {

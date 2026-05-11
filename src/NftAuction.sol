@@ -128,7 +128,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         uint256 _startPrice,    //起拍价
         uint256 _delayHours,    //拍卖开始前的延迟时间，单位小时 [0-24]
         uint256 _durationHours  //拍卖持续时间，单位小时[0-24]
-    ) public {
+    ) public returns (uint256){
         // 先检查nft合约地址合法
         require(_nftContract != address(0), "nft address invalid");
         // 起拍价必须大于0
@@ -180,6 +180,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
             _startTime,
             _durationHours
         );
+        return auctionId;
     }
 
     // 参与竞拍

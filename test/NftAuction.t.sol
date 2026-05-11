@@ -60,7 +60,7 @@ contract NftAuctionTest is Test {
         ethPriceFeed = new MockAggregator(ETH_PRICE);
         usdtPriceFeed = new MockAggregator(USDT_PRICE);
         // 2. 部署 MockERC20 和 MockERC721
-        token = new MockERC20("USDT", "USDT");
+        token = new MockERC20();
         nft = new MockMyNft();
 
         // 3.部署拍卖合约（UUPS 代理模式）
@@ -93,8 +93,7 @@ contract NftAuctionTest is Test {
         // 给卖家铸造个NFT
         vm.prank(seller);
         uint256 actualTokenId = nft.mint(seller);
-        assertEq(TOKEN_ID == actualTokenId, "tokenId should be 0"); // 断言是 0
-
+        assertEq(TOKEN_ID, actualTokenId, "tokenId should be 0"); // 断言是 0
 
         // 5.授权操作
         vm.prank(seller);
@@ -157,7 +156,14 @@ contract NftAuctionTest is Test {
     // ============================================================
 
     function test_CreateAuction_Success() public {
-        // TODO: 实现
+        vm.prank(seller);
+        uint256 auctionId = nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
+        // 验证nft转移到了拍卖合约
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction));
+        // 验证拍卖id第一个是0
+        assertEq(auctionId, 0);
+        // 验证映射被记录
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), TOKEN_ID), auctionId);
     }
 
     function test_CreateAuction_RevertIf_NotOwner() public {

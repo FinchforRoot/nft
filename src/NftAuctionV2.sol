@@ -5,7 +5,7 @@ import {NftAuction} from "./NftAuction.sol";
 
 contract NftAuctionV2 is NftAuction{
 
-    function test() public returns (uint256){
+    function test() public pure returns (uint256){
         return 1;
     }
 }
