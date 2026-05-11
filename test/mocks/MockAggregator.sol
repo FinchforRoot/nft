@@ -7,12 +7,13 @@ contract MockAggregator is AggregatorV3Interface {
 
     int256 answer;
 
+    // 根据传入的answer初始化，直接定死返回的价格对照结果，例如1btc = 10000usd
     constructor(int256 _answer) {
         answer = _answer;
     }
 
     function decimals() external view override returns (uint8){
-        return 18;
+        return 8;
     }
 
     function description() external view override returns (string memory){

@@ -213,7 +213,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
             auction.currentStatus = Status.OnGoing;
         }
         require(auction.currentStatus == Status.OnGoing, "auction not on going");
-        require(auction.startTime < block.timestamp && auction.startTime + auction.duration * 1 hours > block.timestamp, "Time Invalid");
+        require(auction.startTime < block.timestamp && auction.startTime + auction.duration > block.timestamp, "Time Invalid");
         require(auction.seller != msg.sender, "seller can not bid");
         require(address(priceFeeds[_tokenAddress]) != address(0), "Price feed not registered");
         uint256 previousBid = auction.highestBid;
@@ -282,7 +282,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         // 先验证拍卖存在
         require(seller != address(0), "auction not exist");
         // 验证是否到了结束时间
-        require(block.timestamp >= auction.startTime + auction.duration * 1 hours, "Auction not ended");
+        require(block.timestamp >= auction.startTime + auction.duration, "Auction not ended");
         require(auction.currentStatus == Status.OnGoing || auction.currentStatus == Status.Pending,
             "Auction already ended or cancelled");
         address nftAddress = auction.nftContract;

@@ -5,7 +5,304 @@ import {Test} from "forge-std/Test.sol";
 import {NftAuction} from "../src/NftAuction.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockAggregator} from "./mocks/MockAggregator.sol";
+import {MockMyNft} from "./mocks/MockMyNft.sol";
+import {ERC1967Proxy} from "../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract NftAuctionTest is Test {
+    // ============ 合约 ============
+    NftAuction public nftAuction;
+    MockERC20 public token;
+    MockMyNft public nft;
+    MockAggregator public ethPriceFeed;
+    MockAggregator public usdtPriceFeed;
+
+    //  ========= 拍卖合约的管理员、卖家、买家1、买家2 ========
+    address public admin;
+    address public seller;
+    address public buyer1;
+    address public buyer2;
+
+    // ============ 常量 ============
+    uint256 constant TOKEN_ID = 0;
+    uint256 constant START_PRICE = 100; // 100 美元
+    uint256 constant DURATION_HOURS = 24;
+    int256 constant ETH_PRICE = 231812345678; // $2318.12
+    int256 constant USDT_PRICE = 100000000; // $1.00
+
+    // ============ 事件 ============
+    event AuctionCreated(
+        uint256 indexed auctionId,
+        address indexed seller,
+        address indexed nftContract,
+        uint256 tokenId,
+        uint256 startPrice,
+        uint256 startTime,
+        uint256 duration
+    );
+    event AuctionCancelled(uint256 indexed auctionId);
+    event AuctionEnded(
+        uint256 indexed auctionId,
+        address indexed winner,
+        uint256 winningBid,
+        address tokenAddress,
+        uint256 tokenAmount
+    );
+    event NewHighestBid(
+        uint256 indexed auctionId,
+        address indexed bidder,
+        uint256 bid,
+        uint256 bidAmount
+    );
+
+    // setUp函数，在每个测试前执行
+    function setUp() public {
+        // 1.部署价格预言机：ETH $2318.12, USDT $1.00
+        ethPriceFeed = new MockAggregator(ETH_PRICE);
+        usdtPriceFeed = new MockAggregator(USDT_PRICE);
+        // 2. 部署 MockERC20 和 MockERC721
+        token = new MockERC20("USDT", "USDT");
+        nft = new MockMyNft();
+
+        // 3.部署拍卖合约（UUPS 代理模式）
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(new NftAuction()),
+            abi.encodeWithSignature("initialize()")
+        );
+
+        // 将部署的代理合约地址赋给被测试合约，类似类型转换
+        nftAuction = NftAuction(address(proxy));
+        admin = nftAuction.admin();
+
+        // 3.配置价格预言机
+        vm.prank(admin);
+        nftAuction.setPriceFeed(address(0), address(ethPriceFeed));
+        vm.prank(admin);
+        nftAuction.setPriceFeed(address(token), address(usdtPriceFeed));
+
+        // 5. 设置账户
+        seller = makeAddr("seller");
+        buyer1 = makeAddr("buyer1");
+        buyer2 = makeAddr("buyer2");
+
+        // 6. 发钱
+        vm.deal(buyer1, 100 ether);
+        vm.deal(buyer2, 100 ether);
+        token.mint(buyer1, 10000 * 10 ** 6);
+        token.mint(buyer2, 10000 * 10 ** 6);
+
+        // 给卖家铸造个NFT
+        vm.prank(seller);
+        uint256 actualTokenId = nft.mint(seller);
+        assertEq(TOKEN_ID == actualTokenId, "tokenId should be 0"); // 断言是 0
+
+
+        // 5.授权操作
+        vm.prank(seller);
+        nft.approve(address(nftAuction), TOKEN_ID);
+        vm.prank(buyer1);
+        token.approve(address(nftAuction), type(uint256).max);
+        vm.prank(buyer2);
+        token.approve(address(nftAuction), type(uint256).max);
+    }
+
+    // ============================================================
+    // Helper 函数
+    // ============================================================
+
+    /// @dev 创建拍卖（默认参数），返回 auctionId
+    function _createAuction() internal returns (uint256) {
+        return _createAuction(START_PRICE, 0, DURATION_HOURS);
+    }
+
+    /// @dev 创建拍卖（自定义参数）
+    function _createAuction(
+        uint256 startPrice,
+        uint256 delayHours,
+        uint256 durationHours
+    ) internal returns (uint256 auctionId) {
+        vm.prank(seller);
+        auctionId = nftAuction.createAuction(
+            address(nft),
+            TOKEN_ID,
+            startPrice,
+            delayHours,
+            durationHours
+        );
+    }
+
+    /// @dev 快进到拍卖开始后
+    function _warpToStart() internal {
+        vm.warp(block.timestamp + 1 hours);
+    }
+
+    /// @dev 快进到拍卖结束后
+    function _warpToEnd() internal {
+        vm.warp(block.timestamp + (DURATION_HOURS + 1) * 1 hours);
+    }
+
+    /// @dev 前一个人用 ETH 出价
+    function _placeEthBid(uint256 auctionId, address bidder, uint256 amount) internal {
+        vm.prank(bidder);
+        nftAuction.placeBid{value: amount}(auctionId, amount, address(0));
+    }
+
+    /// @dev 前一个人用 USDT 出价
+    function _placeUsdtBid(uint256 auctionId, address bidder, uint256 amount) internal {
+        vm.prank(bidder);
+        nftAuction.placeBid(auctionId, amount, address(token));
+    }
+
+    // ============================================================
+    // createAuction 测试
+    // ============================================================
+
+    function test_CreateAuction_Success() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_RevertIf_NotOwner() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_RevertIf_NotApproved() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_RevertIf_AlreadyInAuction() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_RevertIf_InvalidPrice() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_RevertIf_InvalidDuration() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_TransfersNFTToContract() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_EmitsEvent() public {
+        // TODO: 实现
+    }
+
+    function test_CreateAuction_RecordsMapping() public {
+        // TODO: 实现
+    }
+
+    // ============================================================
+    // placeBid 测试
+    // ============================================================
+
+    function test_PlaceBid_Success_ETH() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_Success_ERC20() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_TooLow() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_SellerBid() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_NotStarted() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_Ended() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_MustExceed105Percent() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
+        // TODO: 实现
+    }
+
+    // ============================================================
+    // endAuction 测试
+    // ============================================================
+
+    function test_EndAuction_Success_ETH() public {
+        // TODO: 实现
+    }
+
+    function test_EndAuction_Success_ERC20() public {
+        // TODO: 实现
+    }
+
+    function test_EndAuction_NoBid_NFTReturned() public {
+        // TODO: 实现
+    }
+
+    function test_EndAuction_RevertIf_NotEnded() public {
+        // TODO: 实现
+    }
+
+    function test_EndAuction_RevertIf_AlreadyEnded() public {
+        // TODO: 实现
+    }
+
+    function test_EndAuction_CleansMapping() public {
+        // TODO: 实现
+    }
+
+    // ============================================================
+    // cancelAuction 测试
+    // ============================================================
+
+    function test_CancelAuction_Success() public {
+        // TODO: 实现
+    }
+
+    function test_CancelAuction_RevertIf_NotSeller() public {
+        // TODO: 实现
+    }
+
+    function test_CancelAuction_RevertIf_AlreadyStarted() public {
+        // TODO: 实现
+    }
+
+    function test_CancelAuction_RevertIf_NotPending() public {
+        // TODO: 实现
+    }
+
+    function test_CancelAuction_CleansMapping() public {
+        // TODO: 实现
+    }
+
+    function test_CancelAuction_ReturnsNFT() public {
+        // TODO: 实现
+    }
+
+    // ============================================================
+    // 升级测试（可选）
+    // ============================================================
+
+    function test_UpgradeContract_Success() public {
+        // TODO: 实现
+    }
+
+    function test_UpgradeContract_RevertIf_NotAdmin() public {
+        // TODO: 实现
+    }
+
 
 }
