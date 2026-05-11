@@ -13,6 +13,5 @@ docs/
 # Dotenv file
 .env
 
-lib
 .idea
 foundry.lock
