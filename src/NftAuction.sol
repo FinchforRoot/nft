@@ -46,7 +46,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
     }
 
     // NFT拍卖合集 第一层 key：NFT 合约地址 第二层 key：NFT 的 tokenId 值：拍卖ID（uint256）
-    mapping(address => mapping(uint256 => uint256)) public nftToken2AuctionId;
+    mapping(address => mapping(uint256 => bool)) public nftToken2AuctionId;
     // 拍卖集合
     mapping(uint256 => Auction) public auctions;
     // 下一个拍卖的id
@@ -134,16 +134,16 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         // 起拍价必须大于0
         require(_startPrice > 0, "start price invalid");
         // 业务设置允许推迟拍卖，为0表示立即开始，上限是24小时后开启拍卖
-        require(_delayHours <= 24,"_delayHours invalid");
+        require(_delayHours <= 24, "_delayHours invalid");
         // 拍卖持续时间为1-24小时
-        require(_durationHours >= 1 && _durationHours <= 24,"_durationHours invalid");
+        require(_durationHours >= 1 && _durationHours <= 24, "_durationHours invalid");
         IERC721 nft = IERC721(_nftContract);
         // 校验这个nft是否已经上架
-        uint256 existingId = nftToken2AuctionId[_nftContract][_tokenId];
+        bool existingFlag = nftToken2AuctionId[_nftContract][_tokenId];
         // 已上架过的NFT不能再次拍卖
-        require(existingId == 0, "NFT already in auction");
+        require(!existingFlag, "NFT already in auction");
         // 校验nft是调用者的
-        require(nft.ownerOf(_tokenId) == msg.sender,"you are not the owner of this nft");
+        require(nft.ownerOf(_tokenId) == msg.sender, "you are not the owner of this nft");
         // 校验该NFT是否已经授权给了本合约
         require(
             nft.getApproved(_tokenId) == address(this) || nft.isApprovedForAll(msg.sender, address(this)),
@@ -154,14 +154,19 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         uint256 auctionId = nextAuctionId++;
         // 转移nft到合约
         nft.transferFrom(msg.sender, address(this), _tokenId);
+        Status status = Status.OnGoing;
+        if (_delayHours > 0) {
+            // 延迟开始
+            status = Status.Pending;
+        }
         auctions[auctionId] = Auction({
             seller: msg.sender,
             nftContract: _nftContract,
             tokenId: _tokenId,
             startPrice: _startPrice,
             startTime: _startTime,
-            duration: _durationHours * 1 hours,
-            currentStatus: Status.Pending,
+            duration: _durationHours,
+            currentStatus: status,
             highestBid: 0,
             highestBidder: address(0),
             highestBidAmount: 0,
@@ -169,7 +174,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         });
 
         // 记录某个NFT是否处于拍卖中
-        nftToken2AuctionId[_nftContract][_tokenId] = auctionId;
+        nftToken2AuctionId[_nftContract][_tokenId] = true;
 
         emit AuctionCreated(
             auctionId,
@@ -295,7 +300,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         if (auction.highestBidder == address(0)) {
             auction.currentStatus = Status.NoBid;
             // 将NFT记录映射进行删除
-            delete nftToken2AuctionId[nftAddress][tokenId];
+            nftToken2AuctionId[nftAddress][tokenId] = false;
             // 将seller抵押的NFT退还
             IERC721(nftAddress).safeTransferFrom(address(this), seller, tokenId);
             emit AuctionEnded(_auctionId, address(0), 0, address(0), 0);
@@ -304,7 +309,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         // 否则更新为结束[先更新为结束状态]
         auction.currentStatus = Status.Ended;
         // 将NFT记录映射进行删除
-        delete nftToken2AuctionId[nftAddress][tokenId];
+        nftToken2AuctionId[nftAddress][tokenId] = false;
         // 再进行资产转移
         if (tokenAddress == address(0)) {
             // 转ETH给卖家
@@ -341,7 +346,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         require(block.timestamp < auction.startTime, "Already started");
         address nftAddress = auction.nftContract;
         // 清理映射
-        delete nftToken2AuctionId[nftAddress][auction.tokenId];
+        nftToken2AuctionId[nftAddress][auction.tokenId] = false;
         // 更新状态
         auction.currentStatus = Status.Cancelled;
         // 退回NFT
