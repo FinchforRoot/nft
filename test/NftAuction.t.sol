@@ -232,72 +232,83 @@ contract NftAuctionTest is Test {
     }
 
     function test_CreateAuction_RevertIf_AlreadyInAuction() public {
-
+        _createAuction(100,0,24);
+        vm.prank(seller);
+        vm.expectRevert("NFT already in auction");
+        nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
     }
-//
-//    function test_CreateAuction_RevertIf_InvalidPrice() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CreateAuction_RevertIf_InvalidDuration() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CreateAuction_TransfersNFTToContract() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CreateAuction_EmitsEvent() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CreateAuction_RecordsMapping() public {
-//        // TODO: 实现
-//    }
-//
+
+    function test_CreateAuction_RevertIf_InvalidPrice() public {
+        vm.prank(seller);
+        vm.expectRevert("start price invalid");
+        nftAuction.createAuction(address(nft), TOKEN_ID, 0, 0, DURATION_HOURS);
+    }
+
+    function test_CreateAuction_RevertIf_InvalidDuration() public {
+        vm.prank(seller);
+        vm.expectRevert("_durationHours invalid");
+        nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, 0);
+    }
+
+    function test_CreateAuction_TransfersNFTToContract() public {
+        assertEq(nft.ownerOf(TOKEN_ID), seller);
+        vm.prank( seller);
+        nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction));
+    }
+
 //    // ============================================================
 //    // placeBid 测试
 //    // ============================================================
-//
-//    function test_PlaceBid_Success_ETH() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_Success_ERC20() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_TooLow() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_SellerBid() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_NotStarted() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_Ended() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_MustExceed105Percent() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
-//        // TODO: 实现
-//    }
+
+    function test_PlaceBid_Success_ETH() public {
+        vm.expectEmit(true,true,true,true);
+        (, uint256 _answer, , , ) = ethPriceFeed.latestRoundData();
+        uint256 bidAmount = 1 * 10**8;
+        uint256 expectedBidAmount = bidAmount * _answer / 10**8;
+        emit NewHighestBid(auctionId, buyer1, expectedBidAmount, address(0));
+
+        uint256 auctionId = _createAuction();
+        vm.prank(buyer1);
+        nftAuction.placeBid(auctionId,bidAmount, address(0));
+
+    }
+
+    function test_PlaceBid_Success_ERC20() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_TooLow() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_SellerBid() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_NotStarted() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RevertIf_Ended() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_MustExceed105Percent() public {
+        // TODO: 实现
+    }
+
+    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
+        // TODO: 实现
+    }
 //
 //    // ============================================================
 //    // endAuction 测试

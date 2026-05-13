@@ -102,7 +102,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
      */
     function getChainlinkDataFeedLatestAnswer(
         address _tokenAddress
-    ) public view returns (int){
+    ) internal view returns (int){
         AggregatorV3Interface priceFeed = priceFeeds[_tokenAddress];
         // prettier-ignore
         (
