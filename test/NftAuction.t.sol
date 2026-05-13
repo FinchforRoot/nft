@@ -271,7 +271,7 @@ contract NftAuctionTest is Test {
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer1, highestBid, bidAmount);
         vm.prank(buyer1);
-        vm.warp(block.timestamp + 1 );
+        vm.warp(block.timestamp + 1);
         nftAuction.placeBid{value: bidAmount}(auctionId, bidAmount, address(0));
         (
             ,
@@ -289,6 +289,7 @@ contract NftAuctionTest is Test {
         assertEq(highestBid_, highestBid, "highestBid mismatch");
         assertEq(highestBidder_, buyer1, "highestBidder mismatch");
         assertEq(highestBidAmount_, bidAmount, "highestBidAmount mismatch");
+        assertEq(tokenAddress_, address(0), "tokenAddress mismatch");
     }
 
     function test_PlaceBid_Success_ERC20() public {
@@ -300,7 +301,7 @@ contract NftAuctionTest is Test {
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer2, highestBid, bidAmount);
         vm.prank(buyer2);
-        vm.warp(block.timestamp + 1 );
+        vm.warp(block.timestamp + 1);
         nftAuction.placeBid(auctionId, bidAmount, address(token));
         (
             ,
@@ -318,23 +319,40 @@ contract NftAuctionTest is Test {
         assertEq(highestBid_, highestBid, "highestBid mismatch");
         assertEq(highestBidder_, buyer2, "highestBidder mismatch");
         assertEq(highestBidAmount_, bidAmount, "highestBidAmount mismatch");
+        assertEq(tokenAddress_, address(token), "tokenAddress mismatch");
     }
 
-//    function test_PlaceBid_RevertIf_TooLow() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_SellerBid() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_NotStarted() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_RevertIf_Ended() public {
-//        // TODO: 实现
-//    }
+    function test_PlaceBid_RevertIf_TooLow() public {
+        uint256 auctionId = _createAuction();
+        vm.prank(buyer1);
+        vm.expectRevert("Bid too low");
+        vm.warp(block.timestamp + 1);
+        nftAuction.placeBid{value: 100}(auctionId, 100, address(0));
+    }
+
+    function test_PlaceBid_RevertIf_SellerBid() public {
+        uint256 auctionId = _createAuction();
+        vm.warp(block.timestamp + 1);
+        vm.expectRevert("seller can not bid");
+        vm.deal(seller, 100 ether);
+        vm.prank(seller);
+        nftAuction.placeBid{value: 1 * 10 ** 18}(auctionId, 1 * 10 ** 18, address(0));
+    }
+
+    function test_PlaceBid_RevertIf_NotStarted() public {
+        uint256 auctionId = _createAuction(10,1,24);
+        vm.prank(buyer1);
+        vm.expectRevert("Not started yet");
+        nftAuction.placeBid{value: 1 * 10 ** 18}(auctionId, 1 * 10 ** 18, address(0));
+    }
+
+    function test_PlaceBid_RevertIf_Ended() public {
+        uint256 auctionId = _createAuction(10,1,24);
+        vm.prank(buyer1);
+        vm.expectRevert("Time Invalid");
+        vm.warp(block.timestamp + 25 * 1 hours );
+        nftAuction.placeBid{value: 1 * 10 ** 18}(auctionId, 1 * 10 ** 18, address(0));
+    }
 //
 //    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
 //        // TODO: 实现

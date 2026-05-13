@@ -41,4 +41,6 @@ function test_SomeFunction() public {
 
 6.真实开发的时候，是不是针对合约的每个方法的每个条件都得进行测试用例的编写，如果方法内部有10个require的条件  是不是至少得写10个test方法来针对每个情况进行测试？
 
-7.
+7.amount的话，针对ETH是不是单位是wei，针对ERC20呢？例如USDT那么单位就是1个代币么？
+
+8.
