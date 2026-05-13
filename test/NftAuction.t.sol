@@ -265,16 +265,11 @@ contract NftAuctionTest is Test {
     function test_PlaceBid_Success_ETH() public {
         uint256 auctionId = _createAuction();
         (, int256 _answer, , ,) = ethPriceFeed.latestRoundData();
-        console.log("_answer: ", _answer);
         // 假设出价1ETH
         uint256 bidAmount = 1 * 10 ** 18;
         uint256 highestBid = bidAmount * uint256(_answer) / 10 ** 18;
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer1, highestBid, bidAmount);
-        console.log("auctionId: ", auctionId);
-        console.log("buyer1: ", buyer1);
-        console.log("highestBid: ", highestBid);
-        console.log("bidAmount: ", bidAmount);
         vm.prank(buyer1);
         vm.warp(block.timestamp + 1 );
         nftAuction.placeBid{value: bidAmount}(auctionId, bidAmount, address(0));
@@ -291,21 +286,40 @@ contract NftAuctionTest is Test {
             uint256 highestBidAmount_,
             address tokenAddress_
         ) = nftAuction.auctions(auctionId);
-
-        console.log("highestBid_: ", highestBid_);
-        console.log("highestBidder_: ", highestBidder_);
-        console.log("highestBidAmount_: ", highestBidAmount_);
-        console.log("tokenAddress_: ", tokenAddress_);
-
         assertEq(highestBid_, highestBid, "highestBid mismatch");
         assertEq(highestBidder_, buyer1, "highestBidder mismatch");
         assertEq(highestBidAmount_, bidAmount, "highestBidAmount mismatch");
     }
 
-//    function test_PlaceBid_Success_ERC20() public {
-//        // TODO: 实现
-//    }
-//
+    function test_PlaceBid_Success_ERC20() public {
+        uint256 auctionId = _createAuction();
+        (, int256 answer, , ,) = usdtPriceFeed.latestRoundData();
+        // 假设出价101USDT
+        uint256 bidAmount = 101 * 10 ** 6;
+        uint256 highestBid = bidAmount * uint256(answer) / 10 ** 6;
+        vm.expectEmit(true, true, true, true);
+        emit NewHighestBid(auctionId, buyer2, highestBid, bidAmount);
+        vm.prank(buyer2);
+        vm.warp(block.timestamp + 1 );
+        nftAuction.placeBid(auctionId, bidAmount, address(token));
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 highestBid_,
+            address highestBidder_,
+            uint256 highestBidAmount_,
+            address tokenAddress_
+        ) = nftAuction.auctions(auctionId);
+        assertEq(highestBid_, highestBid, "highestBid mismatch");
+        assertEq(highestBidder_, buyer2, "highestBidder mismatch");
+        assertEq(highestBidAmount_, bidAmount, "highestBidAmount mismatch");
+    }
+
 //    function test_PlaceBid_RevertIf_TooLow() public {
 //        // TODO: 实现
 //    }

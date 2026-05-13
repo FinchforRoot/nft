@@ -233,8 +233,8 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         // 计算出价，转换为美元
         uint256 payValue;
         if (_tokenAddress != address(0)) {
-            // 是ERC20代币
-            payValue = _bidAmount * uint(getChainlinkDataFeedLatestAnswer(_tokenAddress)) / 10 ** 8;
+            // 是ERC20代币[项目中设为USDT的精度6]
+            payValue = _bidAmount * uint(getChainlinkDataFeedLatestAnswer(_tokenAddress)) / 10 ** 6;
         } else {
             require(msg.value == _bidAmount, "ETH bid amount mismatch");
             _bidAmount = msg.value;
