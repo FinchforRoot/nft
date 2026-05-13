@@ -153,6 +153,25 @@ contract NftAuctionTest is Test {
         nftAuction.placeBid(auctionId, amount, address(token));
     }
 
+    function _approveNFT(address owner,uint256 tokenId) internal{
+        vm.prank(owner);
+        nft.approve(address(nftAuction), tokenId);
+    }
+
+    function _revokeNFT(address owner,uint256 tokenId) internal{
+        vm.prank(owner);
+        nft.approve(address(0), tokenId);
+    }
+
+    function _approveToken(address owner,uint256 amount) internal{
+        vm.prank(owner);
+        token.approve(address(nftAuction), amount);
+    }
+
+    function _revokeToken(address owner,uint256 amount) internal{
+        vm.prank(owner);
+        token.approve(address(0), amount);
+    }
     // ============================================================
     // createAuction 测试
     // ============================================================
@@ -185,31 +204,36 @@ contract NftAuctionTest is Test {
             address tokenAddress_
         ) = nftAuction.auctions(auctionId);
         // 验证auction的数据是否符合预期
-        assertEq(seller_,seller,"seller mismatch");
-        assertEq(nftContract_,address(nft),"nftContract mismatch");
-        assertEq(tokenId_,TOKEN_ID,"tokenId mismatch");
-        assertEq(startPrice_,START_PRICE,"startPrice mismatch");
-        assertEq(startTime_,expectedStartTime,"startTime mismatch");
-        assertEq(duration_,DURATION_HOURS,"duration mismatch");
+        assertEq(seller_, seller, "seller mismatch");
+        assertEq(nftContract_, address(nft), "nftContract mismatch");
+        assertEq(tokenId_, TOKEN_ID, "tokenId mismatch");
+        assertEq(startPrice_, START_PRICE, "startPrice mismatch");
+        assertEq(startTime_, expectedStartTime, "startTime mismatch");
+        assertEq(duration_, DURATION_HOURS, "duration mismatch");
         // 因为startTime是0 表示立即开始
-        assertEq(uint256(currentStatus_), uint256(NftAuction.Status.OnGoing),"currentStatus mismatch");
-        assertEq(highestBid_,0,"highestBid mismatch");
-        assertEq(highestBidder_,address(0),"highestBidder mismatch");
-        assertEq(highestBidAmount_,0,"highestBidAmount mismatch");
-        assertEq(tokenAddress_,address(0),"tokenAddress mismatch");
+        assertEq(uint256(currentStatus_), uint256(NftAuction.Status.OnGoing), "currentStatus mismatch");
+        assertEq(highestBid_, 0, "highestBid mismatch");
+        assertEq(highestBidder_, address(0), "highestBidder mismatch");
+        assertEq(highestBidAmount_, 0, "highestBidAmount mismatch");
+        assertEq(tokenAddress_, address(0), "tokenAddress mismatch");
     }
-//
-//    function test_CreateAuction_RevertIf_NotOwner() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CreateAuction_RevertIf_NotApproved() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CreateAuction_RevertIf_AlreadyInAuction() public {
-//        // TODO: 实现
-//    }
+
+    function test_CreateAuction_RevertIf_NotOwner() public {
+        vm.prank(admin);
+        vm.expectRevert("you are not the owner of this nft");
+        nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
+    }
+
+    function test_CreateAuction_RevertIf_NotApproved() public {
+        _revokeNFT(seller, TOKEN_ID);
+        vm.prank(seller);
+        vm.expectRevert("Marketplace not approved");
+        nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
+    }
+
+    function test_CreateAuction_RevertIf_AlreadyInAuction() public {
+
+    }
 //
 //    function test_CreateAuction_RevertIf_InvalidPrice() public {
 //        // TODO: 实现

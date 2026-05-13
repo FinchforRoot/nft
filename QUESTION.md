@@ -11,3 +11,34 @@ vm.expectEmit(true, true, true, true);
 emit AuctionCreated(0, seller, address(nft), TOKEN_ID, START_PRICE, block.timestamp, DURATION_HOURS);
 最后再调用合约的方法进行事件验证？
 
+5.写测试用例的时候得先vm.expectRevert("you are not the owner of this nft");才可以调用合约函数进行require验证？  
+哪有那些操作是放在执行合约函数前面的 哪些操作是放在执行合约后面的？
+```SOLIDITY
+function test_SomeFunction() public {
+    // ============ 阶段1: 准备 ============
+    // 设置初始状态
+    // - vm.deal, vm.prank, vm.warp
+    // - 铸造代币、授权等准备操作
+    
+    // ============ 阶段2: 设置期望 ============
+    // 如果是成功场景：
+    // - vm.expectEmit (期望事件)
+    // - 计算期望的返回值
+    
+    // 如果是失败场景：
+    // - vm.expectRevert (期望错误)
+    
+    // ============ 阶段3: 执行 ============
+    // - vm.prank (设置msg.sender)
+    // - 调用合约函数
+    
+    // ============ 阶段4: 验证 ============
+    // - assertEq, assertTrue 等断言
+    // - 检查状态变化
+    // - 检查返回值
+}
+```
+
+6.真实开发的时候，是不是针对合约的每个方法的每个条件都得进行测试用例的编写，如果方法内部有10个require的条件  是不是至少得写10个test方法来针对每个情况进行测试？
+
+7.
