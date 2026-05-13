@@ -7,6 +7,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockMyNft} from "./mocks/MockMyNft.sol";
 import {NftAuction} from "../src/NftAuction.sol";
 import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
 
 contract NftAuctionTest is Test {
 
@@ -14,8 +15,8 @@ contract NftAuctionTest is Test {
     NftAuction public nftAuction;
     MockERC20 public token;
     MockMyNft public nft;
-    MockAggregator public ethPriceFeed;
-    MockAggregator public usdtPriceFeed;
+    MockAggregator public ethPriceFeed;  // 8位精度
+    MockAggregator public usdtPriceFeed;    // 8位精度
 
     //  ========= 拍卖合约的管理员、卖家、买家1、买家2 ========
     address public admin;
@@ -153,22 +154,22 @@ contract NftAuctionTest is Test {
         nftAuction.placeBid(auctionId, amount, address(token));
     }
 
-    function _approveNFT(address owner,uint256 tokenId) internal{
+    function _approveNFT(address owner, uint256 tokenId) internal {
         vm.prank(owner);
         nft.approve(address(nftAuction), tokenId);
     }
 
-    function _revokeNFT(address owner,uint256 tokenId) internal{
+    function _revokeNFT(address owner, uint256 tokenId) internal {
         vm.prank(owner);
         nft.approve(address(0), tokenId);
     }
 
-    function _approveToken(address owner,uint256 amount) internal{
+    function _approveToken(address owner, uint256 amount) internal {
         vm.prank(owner);
         token.approve(address(nftAuction), amount);
     }
 
-    function _revokeToken(address owner,uint256 amount) internal{
+    function _revokeToken(address owner, uint256 amount) internal {
         vm.prank(owner);
         token.approve(address(0), amount);
     }
@@ -232,7 +233,7 @@ contract NftAuctionTest is Test {
     }
 
     function test_CreateAuction_RevertIf_AlreadyInAuction() public {
-        _createAuction(100,0,24);
+        _createAuction(100, 0, 24);
         vm.prank(seller);
         vm.expectRevert("NFT already in auction");
         nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
@@ -252,7 +253,7 @@ contract NftAuctionTest is Test {
 
     function test_CreateAuction_TransfersNFTToContract() public {
         assertEq(nft.ownerOf(TOKEN_ID), seller);
-        vm.prank( seller);
+        vm.prank(seller);
         nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
         assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction));
     }
@@ -262,53 +263,80 @@ contract NftAuctionTest is Test {
 //    // ============================================================
 
     function test_PlaceBid_Success_ETH() public {
-        vm.expectEmit(true,true,true,true);
-        (, uint256 _answer, , , ) = ethPriceFeed.latestRoundData();
-        uint256 bidAmount = 1 * 10**8;
-        uint256 expectedBidAmount = bidAmount * _answer / 10**8;
-        emit NewHighestBid(auctionId, buyer1, expectedBidAmount, address(0));
-
         uint256 auctionId = _createAuction();
+        (, int256 _answer, , ,) = ethPriceFeed.latestRoundData();
+        console.log("_answer: ", _answer);
+        // 假设出价1ETH
+        uint256 bidAmount = 1 * 10 ** 18;
+        uint256 highestBid = bidAmount * uint256(_answer) / 10 ** 18;
+        vm.expectEmit(true, true, true, true);
+        emit NewHighestBid(auctionId, buyer1, highestBid, bidAmount);
+        console.log("auctionId: ", auctionId);
+        console.log("buyer1: ", buyer1);
+        console.log("highestBid: ", highestBid);
+        console.log("bidAmount: ", bidAmount);
         vm.prank(buyer1);
-        nftAuction.placeBid(auctionId,bidAmount, address(0));
+        vm.warp(block.timestamp + 1 );
+        nftAuction.placeBid{value: bidAmount}(auctionId, bidAmount, address(0));
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 highestBid_,
+            address highestBidder_,
+            uint256 highestBidAmount_,
+            address tokenAddress_
+        ) = nftAuction.auctions(auctionId);
 
+        console.log("highestBid_: ", highestBid_);
+        console.log("highestBidder_: ", highestBidder_);
+        console.log("highestBidAmount_: ", highestBidAmount_);
+        console.log("tokenAddress_: ", tokenAddress_);
+
+        assertEq(highestBid_, highestBid, "highestBid mismatch");
+        assertEq(highestBidder_, buyer1, "highestBidder mismatch");
+        assertEq(highestBidAmount_, bidAmount, "highestBidAmount mismatch");
     }
 
-    function test_PlaceBid_Success_ERC20() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_RevertIf_TooLow() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_RevertIf_SellerBid() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_RevertIf_NotStarted() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_RevertIf_Ended() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_MustExceed105Percent() public {
-        // TODO: 实现
-    }
-
-    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
-        // TODO: 实现
-    }
+//    function test_PlaceBid_Success_ERC20() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_RevertIf_TooLow() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_RevertIf_SellerBid() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_RevertIf_NotStarted() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_RevertIf_Ended() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_MustExceed105Percent() public {
+//        // TODO: 实现
+//    }
+//
+//    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
+//        // TODO: 实现
+//    }
 //
 //    // ============================================================
 //    // endAuction 测试

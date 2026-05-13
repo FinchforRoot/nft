@@ -5,7 +5,7 @@ import {AggregatorV3Interface} from "chainlink-brownie-contracts/contracts/src/v
 
 contract MockAggregator is AggregatorV3Interface {
 
-    int256 answer;
+    int256 public answer;
 
     // 根据传入的answer初始化，直接定死返回的价格对照结果，例如1btc = 10000usd
     constructor(int256 _answer) {
@@ -24,15 +24,15 @@ contract MockAggregator is AggregatorV3Interface {
         return 0;
     }
 
-    function getRoundData(uint80) external pure override returns (uint80 roundId, int256 _answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
-        return (0, _answer, 0, 0, 0);
+    function getRoundData(uint80) external view override returns (uint80 roundId, int256 _answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
+        return (0, answer, 0, 0, 0);
     }
 
     function latestRoundData()
     external
-    pure
+    view
     override returns (uint80 roundId, int256 _answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
-        return (0, _answer, 0, 0, 0);
+        return (0, answer, 0, 0, 0);
     }
 
     function setPrice(int256 _answer) public {
