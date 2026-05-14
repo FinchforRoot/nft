@@ -90,6 +90,7 @@ contract NftAuctionTest is Test {
         // 6. 发钱
         vm.deal(buyer1, 100 ether);
         vm.deal(buyer2, 100 ether);
+        // 7. 发 USDT 1W美元
         token.mint(buyer1, 10000 * 10 ** 6);
         token.mint(buyer2, 10000 * 10 ** 6);
 
@@ -340,24 +341,79 @@ contract NftAuctionTest is Test {
     }
 
     function test_PlaceBid_RevertIf_NotStarted() public {
-        uint256 auctionId = _createAuction(10,1,24);
+        uint256 auctionId = _createAuction(10, 1, 24);
         vm.prank(buyer1);
         vm.expectRevert("Not started yet");
         nftAuction.placeBid{value: 1 * 10 ** 18}(auctionId, 1 * 10 ** 18, address(0));
     }
 
     function test_PlaceBid_RevertIf_Ended() public {
-        uint256 auctionId = _createAuction(10,1,24);
+        uint256 auctionId = _createAuction(10, 1, 24);
         vm.prank(buyer1);
         vm.expectRevert("Time Invalid");
-        vm.warp(block.timestamp + 25 * 1 hours );
+        vm.warp(block.timestamp + 25 * 1 hours);
         nftAuction.placeBid{value: 1 * 10 ** 18}(auctionId, 1 * 10 ** 18, address(0));
     }
-//
-//    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
-//        // TODO: 实现
-//    }
-//
+
+    function test_PlaceBid_RefundsPreviousBidder_ETH() public {
+        uint256 auctionId = _createAuction();
+        _placeEthBid(auctionId, buyer1, 1 ether);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 firstHighestBid_,
+            address firstHighestBidder_,
+            uint256 firstHighestBidAmount_,
+            address firstTokenAddress_
+        ) = nftAuction.actions(auctionId);
+        assertEq(buyer1.balance, 99 ether, "buyer1 balance mismatch");
+        assertEq(buyer2.balance, 100 ether, "buyer2 balance mismatch");
+        assertEq(firstHighestBid_, firstHighestBid, "firstHighestBid mismatch");
+        _placeEthBid(auctionId, buyer2, 2 ether);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 secondHighestBid_,
+            address secondHighestBidder_,
+            uint256 secondHighestBidAmount_,
+            address secondTokenAddress_
+        ) = nftAuction.actions(auctionId);
+        assertEq(buyer1.balance, 100 ether, "buyer1 balance mismatch");
+        assertEq(buyer2.balance, 98 ether, "buyer2 balance mismatch");
+
+        // 执行前
+        uint256 buyer1balanceBefore = buyer1.balance;
+        console.log("buyer1 ETH before:", buyer1balanceBefore);
+        vm.prank(buyer1);
+        vm.warp(block.timestamp + 1);
+        nftAuction.placeBid{value: 1 * 10 ** 17}(auctionId, 1 * 10 ** 17, address(0));
+        // 执行后
+        uint256 buyer1balanceAfter = buyer1.balance;
+        console.log("buyer1 ETH after:", buyer1balanceAfter);
+
+        // 然后继续测试buyer2出价
+        uint256 buyer2balanceBefore = buyer2.balance;
+        console.log("buyer2 ETH before:", buyer2balanceBefore);
+        vm.prank(buyer2);
+        nftAuction.placeBid{value: 2 * 10 ** 17}(auctionId, 2 * 10 ** 17, address(0));
+        uint256 buyer2balanceAfter = buyer2.balance;
+        console.log("buyer2 ETH after:", buyer2balanceAfter);
+
+        uint256 balanceAfterBuyer2 = buyer1.balance;
+        console.log("buyer1 ETH after Buyer2 bid:", balanceAfterBuyer2);
+
+    }
+
 //    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
 //        // TODO: 实现
 //    }
