@@ -211,7 +211,7 @@ contract NftAuctionTest is Test {
         assertEq(tokenId_, TOKEN_ID, "tokenId mismatch");
         assertEq(startPrice_, START_PRICE, "startPrice mismatch");
         assertEq(startTime_, expectedStartTime, "startTime mismatch");
-        assertEq(duration_, DURATION_HOURS, "duration mismatch");
+        assertEq(duration_, DURATION_HOURS * 1 hours, "duration mismatch");
         // 因为startTime是0 表示立即开始
         assertEq(uint256(currentStatus_), uint256(NftAuction.Status.OnGoing), "currentStatus mismatch");
         assertEq(highestBid_, 0, "highestBid mismatch");
@@ -357,6 +357,10 @@ contract NftAuctionTest is Test {
 
     function test_PlaceBid_RefundsPreviousBidder_ETH() public {
         uint256 auctionId = _createAuction();
+        vm.warp(block.timestamp + 1);
+        // 预言机获取价格
+        (, int256 _answer, , ,) = ethPriceFeed.latestRoundData();
+        // buyer1出价
         _placeEthBid(auctionId, buyer1, 1 ether);
         (
             ,
@@ -370,10 +374,14 @@ contract NftAuctionTest is Test {
             address firstHighestBidder_,
             uint256 firstHighestBidAmount_,
             address firstTokenAddress_
-        ) = nftAuction.actions(auctionId);
+        ) = nftAuction.auctions(auctionId);
+        uint256 firstHighestBid = 1 ether * uint256(_answer) / 10 ** 18;
         assertEq(buyer1.balance, 99 ether, "buyer1 balance mismatch");
         assertEq(buyer2.balance, 100 ether, "buyer2 balance mismatch");
         assertEq(firstHighestBid_, firstHighestBid, "firstHighestBid mismatch");
+        assertEq(firstHighestBidder_, buyer1, "firstHighestBidder mismatch");
+        assertEq(firstHighestBidAmount_, 1 ether, "firstHighestBidAmount mismatch");
+        // buyer2出价
         _placeEthBid(auctionId, buyer2, 2 ether);
         (
             ,
@@ -387,44 +395,106 @@ contract NftAuctionTest is Test {
             address secondHighestBidder_,
             uint256 secondHighestBidAmount_,
             address secondTokenAddress_
-        ) = nftAuction.actions(auctionId);
+        ) = nftAuction.auctions(auctionId);
+        uint256 secondHighestBid = 2 ether * uint256(_answer) / 10 ** 18;
         assertEq(buyer1.balance, 100 ether, "buyer1 balance mismatch");
         assertEq(buyer2.balance, 98 ether, "buyer2 balance mismatch");
-
-        // 执行前
-        uint256 buyer1balanceBefore = buyer1.balance;
-        console.log("buyer1 ETH before:", buyer1balanceBefore);
-        vm.prank(buyer1);
-        vm.warp(block.timestamp + 1);
-        nftAuction.placeBid{value: 1 * 10 ** 17}(auctionId, 1 * 10 ** 17, address(0));
-        // 执行后
-        uint256 buyer1balanceAfter = buyer1.balance;
-        console.log("buyer1 ETH after:", buyer1balanceAfter);
-
-        // 然后继续测试buyer2出价
-        uint256 buyer2balanceBefore = buyer2.balance;
-        console.log("buyer2 ETH before:", buyer2balanceBefore);
-        vm.prank(buyer2);
-        nftAuction.placeBid{value: 2 * 10 ** 17}(auctionId, 2 * 10 ** 17, address(0));
-        uint256 buyer2balanceAfter = buyer2.balance;
-        console.log("buyer2 ETH after:", buyer2balanceAfter);
-
-        uint256 balanceAfterBuyer2 = buyer1.balance;
-        console.log("buyer1 ETH after Buyer2 bid:", balanceAfterBuyer2);
-
+        assertEq(secondHighestBid_, secondHighestBid, "secondHighestBid mismatch");
+        assertEq(secondHighestBidder_, buyer2, "secondHighestBidder mismatch");
+        assertEq(secondHighestBidAmount_, 2 ether, "secondHighestBidAmount mismatch");
     }
 
-//    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_MustExceed105Percent() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
-//        // TODO: 实现
-//    }
+    function test_PlaceBid_RefundsPreviousBidder_ERC20() public {
+        uint256 auctionId = _createAuction();
+        vm.warp(block.timestamp + 1);
+        // 预言机获取价格
+        (, int256 _answer, , ,) = usdtPriceFeed.latestRoundData();
+        _placeUsdtBid(auctionId, buyer1, 101 * 10 ** 6);
+        uint256 price = 101 * 10 ** 6 * uint256(_answer) / 10 ** 6;
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 firstHighestBid_,
+            address firstHighestBidder_,
+            uint256 firstHighestBidAmount_,
+            address firstTokenAddress_
+        ) = nftAuction.auctions(auctionId);
+        assertEq(token.balanceOf(buyer1), 10000 * 10 ** 6 - 101 * 10 ** 6, "buyer1 balance mismatch");
+        assertEq(token.balanceOf(buyer2), 10000 * 10 ** 6, "buyer2 balance mismatch");
+        assertEq(firstHighestBid_, price, "firstHighestBid mismatch");
+        assertEq(firstHighestBidder_, buyer1, "firstHighestBidder mismatch");
+        assertEq(firstHighestBidAmount_, 101 * 10 ** 6, "firstHighestBidAmount mismatch");
+        assertEq(firstTokenAddress_, address(token), "tokenAddress mismatch");
+    }
+
+    function test_PlaceBid_MustExceed105Percent() public {
+        uint256 auctionId = _createAuction();
+        vm.warp(block.timestamp + 1);
+        // 预言机获取价格
+        (, int256 _answer, , ,) = usdtPriceFeed.latestRoundData();
+        _placeUsdtBid(auctionId, buyer1, 101 * 10 ** 6);
+        uint256 price = 101 * 10 ** 6 * uint256(_answer) / 10 ** 6;
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 firstHighestBid_,
+            address firstHighestBidder_,
+            uint256 firstHighestBidAmount_,
+            address firstTokenAddress_
+        ) = nftAuction.auctions(auctionId);
+        assertEq(token.balanceOf(buyer1), 10000 * 10 ** 6 - 101 * 10 ** 6, "buyer1 balance mismatch");
+        assertEq(token.balanceOf(buyer2), 10000 * 10 ** 6, "buyer2 balance mismatch");
+        assertEq(firstHighestBid_, price, "firstHighestBid mismatch");
+        assertEq(firstHighestBidder_, buyer1, "firstHighestBidder mismatch");
+        assertEq(firstHighestBidAmount_, 101 * 10 ** 6, "firstHighestBidAmount mismatch");
+        assertEq(firstTokenAddress_, address(token), "tokenAddress mismatch");
+        vm.expectRevert("Bid too low");
+        _placeUsdtBid(auctionId, buyer2, 102 * 10 ** 6);
+    }
+
+    function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
+        uint256 auctionId = _createAuction(100,1,24);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            NftAuction.Status currentState_,
+            ,
+            ,
+            ,
+
+        ) = nftAuction.auctions(auctionId);
+        assertEq(uint256(currentState_), uint256(NftAuction.Status.Pending), "currentState mismatch");
+        vm.warp(block.timestamp + 2 * 1 hours);
+        _placeEthBid(auctionId, buyer1, 1 ether);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            NftAuction.Status currentStateNew_,
+            ,
+            ,
+            ,
+
+        ) = nftAuction.auctions(auctionId);
+        assertEq(uint256(currentStateNew_), uint256(NftAuction.Status.OnGoing), "currentStateNew mismatch");
+    }
 //
 //    // ============================================================
 //    // endAuction 测试

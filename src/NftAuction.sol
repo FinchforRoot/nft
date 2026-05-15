@@ -164,7 +164,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
             tokenId: _tokenId,
             startPrice: _startPrice,
             startTime: _startTime,
-            duration: _durationHours,
+            duration: _durationHours * 1 hours,
             currentStatus: status,
             highestBid: 0,
             highestBidder: address(0),
