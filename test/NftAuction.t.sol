@@ -463,7 +463,7 @@ contract NftAuctionTest is Test {
     }
 
     function test_PlaceBid_AutoTransitionsFromPendingToOnGoing() public {
-        uint256 auctionId = _createAuction(100,1,24);
+        uint256 auctionId = _createAuction(100, 1, 24);
         (
             ,
             ,
@@ -495,19 +495,97 @@ contract NftAuctionTest is Test {
         ) = nftAuction.auctions(auctionId);
         assertEq(uint256(currentStateNew_), uint256(NftAuction.Status.OnGoing), "currentStateNew mismatch");
     }
-//
-//    // ============================================================
-//    // endAuction 测试
-//    // ============================================================
-//
-//    function test_EndAuction_Success_ETH() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_EndAuction_Success_ERC20() public {
-//        // TODO: 实现
-//    }
-//
+
+    // ============================================================
+    // endAuction 测试
+    // ============================================================
+
+    function test_EndAuction_Success_ETH() public {
+        // 检查初始状态
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+
+        // 创建拍卖
+        uint256 auctionId = _createAuction();
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+
+        // 记录余额
+        uint256 sellerBalanceBefore = address(seller).balance;
+
+        // 出价
+        vm.warp(block.timestamp + 1);
+        _placeEthBid(auctionId, buyer1, 1 ether);
+
+        // 快进时间到拍卖结束
+        vm.warp(block.timestamp + 25 * 1 hours);
+
+        // 结束拍卖
+        nftAuction.endAuction(auctionId);
+
+        // 获取拍卖信息
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            NftAuction.Status currentStateNew_,
+            ,
+            address finalHighestBidder_,
+            uint256 finalHighestBidAmount_,
+        ) = nftAuction.auctions(auctionId);
+
+        // 断言
+        assertEq(uint256(currentStateNew_), uint256(NftAuction.Status.Ended), "final state mismatch");
+        assertEq(nft.ownerOf(TOKEN_ID), buyer1, "final nft owner mismatch");
+        assertEq(finalHighestBidder_, buyer1, "highest bidder mismatch");
+        assertEq(finalHighestBidAmount_, 1 ether, "bid amount mismatch");
+        assertEq(address(seller).balance - sellerBalanceBefore, 1 ether, "seller balance not match");
+    }
+
+    function test_EndAuction_Success_ERC20() public {
+        // 检查初始状态
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+
+        // 创建拍卖
+        uint256 auctionId = _createAuction();
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+
+        uint256 sellerBalanceBefore = token.balanceOf(seller);
+
+        // 出价
+        vm.warp(block.timestamp + 1);
+        _placeUsdtBid(auctionId, buyer2, 200 * 10 ** 6);
+
+        // 快进时间到拍卖结束
+        vm.warp(block.timestamp + 25 * 1 hours);
+
+        // 结束拍卖
+        nftAuction.endAuction(auctionId);
+
+        // 获取拍卖信息
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            NftAuction.Status currentStateNew_,
+            ,
+            address finalHighestBidder_,
+            uint256 finalHighestBidAmount_,
+        ) = nftAuction.auctions(auctionId);
+
+        // 断言
+        assertEq(uint256(currentStateNew_), uint256(NftAuction.Status.Ended), "final state mismatch");
+        assertEq(nft.ownerOf(TOKEN_ID), buyer2, "final nft owner mismatch");
+        assertEq(finalHighestBidder_, buyer2, "highest bidder mismatch");
+        assertEq(finalHighestBidAmount_, 200 * 10 ** 6, "bid amount mismatch");
+        assertEq(token.balanceOf(seller) - sellerBalanceBefore, 200 * 10 ** 6, "seller ERC20 balance not match");
+        assertEq(token.balanceOf(buyer2), 10000 * 10 ** 6 - 200 * 10 ** 6, "buyer2 ERC20 balance not match");
+    }
+
 //    function test_EndAuction_NoBid_NFTReturned() public {
 //        // TODO: 实现
 //    }
@@ -523,11 +601,11 @@ contract NftAuctionTest is Test {
 //    function test_EndAuction_CleansMapping() public {
 //        // TODO: 实现
 //    }
-//
-//    // ============================================================
-//    // cancelAuction 测试
-//    // ============================================================
-//
+
+    // ============================================================
+    // cancelAuction 测试
+    // ============================================================
+
 //    function test_CancelAuction_Success() public {
 //        // TODO: 实现
 //    }
@@ -551,11 +629,11 @@ contract NftAuctionTest is Test {
 //    function test_CancelAuction_ReturnsNFT() public {
 //        // TODO: 实现
 //    }
-//
-//    // ============================================================
-//    // 升级测试（可选）
-//    // ============================================================
-//
+
+    // ============================================================
+    // 升级测试（可选）
+    // ============================================================
+
 //    function test_UpgradeContract_Success() public {
 //        // TODO: 实现
 //    }
