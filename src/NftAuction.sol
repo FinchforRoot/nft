@@ -7,6 +7,7 @@ import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/prox
 import {Initializable} from "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {AggregatorV3Interface} from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+
 contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
 
     // 拍卖结构
@@ -66,11 +67,13 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         uint256 duration    // 拍卖持续时间【小时】
     );
     // 取消竞拍
-    event AuctionCancelled(uint256 indexed auctionId);
+    event AuctionCancelled(uint256 indexed auctionId, address indexed seller, address indexed nftContract, uint256 tokenId);
     // 竞拍结束
     event AuctionEnded(
         uint256 indexed auctionId,  // 拍卖品id
         address indexed winner, // 获胜者地址
+        address indexed nftContract, // nft合约地址
+        uint256 tokenId, // nft的tokenId
         uint256 winningBid,  // 获胜金额【美元】
         address tokenAddress,      // 代币地址
         uint256 tokenAmount         // 代币数量
@@ -302,7 +305,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
             nftToken2AuctionId[nftAddress][tokenId] = false;
             // 将seller抵押的NFT退还
             IERC721(nftAddress).safeTransferFrom(address(this), seller, tokenId);
-            emit AuctionEnded(_auctionId, address(0), 0, address(0), 0);
+            emit AuctionEnded(_auctionId, address(0), nftAddress, tokenId, 0, address(0), 0);
             return;
         }
         // 否则更新为结束[先更新为结束状态]
@@ -323,7 +326,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         // 将nft转移给最高出价的买家
         IERC721(nftAddress).safeTransferFrom(address(this), highestBidder, tokenId);
         // 发送拍卖结束事件
-        emit AuctionEnded(_auctionId, highestBidder, auction.highestBid, auction.tokenAddress, auction.highestBidAmount);
+        emit AuctionEnded(_auctionId, highestBidder, nftAddress, tokenId, auction.highestBid, auction.tokenAddress, auction.highestBidAmount);
     }
 
     /**
@@ -333,7 +336,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
      */
     function cancelAuction(uint256 _auctionId) external nonReentrant {
         // 验证拍卖ID有效
-        require(_auctionId > 0 && _auctionId < nextAuctionId, "Invalid auction ID");
+        require(_auctionId < nextAuctionId, "Invalid auction ID");
         Auction storage auction = auctions[_auctionId];
         // 验证拍卖存在（通过检查seller不为零地址）
         require(auction.seller != address(0), "Auction not exist");
@@ -350,6 +353,6 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         auction.currentStatus = Status.Cancelled;
         // 退回NFT
         IERC721(nftAddress).transferFrom(address(this), auction.seller, auction.tokenId);
-        emit AuctionCancelled(_auctionId);
+        emit AuctionCancelled(_auctionId, auction.seller, nftAddress, auction.tokenId);
     }
 }
