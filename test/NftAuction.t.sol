@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {NftAuctionV2} from "../src/NftAuctionV2.sol";
 import {ERC1967Proxy} from "../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockAggregator} from "./mocks/MockAggregator.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockMyNft} from "./mocks/MockMyNft.sol";
 import {NftAuction} from "../src/NftAuction.sol";
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 
 contract NftAuctionTest is Test {
 
@@ -155,12 +155,12 @@ contract NftAuctionTest is Test {
         nftAuction.placeBid(auctionId, amount, address(token));
     }
 
-    function _approveNFT(address owner, uint256 tokenId) internal {
+    function _approveNft(address owner, uint256 tokenId) internal {
         vm.prank(owner);
         nft.approve(address(nftAuction), tokenId);
     }
 
-    function _revokeNFT(address owner, uint256 tokenId) internal {
+    function _revokeNft(address owner, uint256 tokenId) internal {
         vm.prank(owner);
         nft.approve(address(0), tokenId);
     }
@@ -227,7 +227,7 @@ contract NftAuctionTest is Test {
     }
 
     function test_CreateAuction_RevertIf_NotApproved() public {
-        _revokeNFT(seller, TOKEN_ID);
+        _revokeNft(seller, TOKEN_ID);
         vm.prank(seller);
         vm.expectRevert("Marketplace not approved");
         nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
@@ -268,6 +268,7 @@ contract NftAuctionTest is Test {
         (, int256 _answer, , ,) = ethPriceFeed.latestRoundData();
         // 假设出价1ETH
         uint256 bidAmount = 1 * 10 ** 18;
+        require(_answer > 0, "Price must be positive");
         uint256 highestBid = bidAmount * uint256(_answer) / 10 ** 18;
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer1, highestBid, bidAmount);
@@ -298,6 +299,7 @@ contract NftAuctionTest is Test {
         (, int256 answer, , ,) = usdtPriceFeed.latestRoundData();
         // 假设出价101USDT
         uint256 bidAmount = 101 * 10 ** 6;
+        require(answer > 0, "Price must be positive");
         uint256 highestBid = bidAmount * uint256(answer) / 10 ** 6;
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer2, highestBid, bidAmount);
@@ -777,16 +779,41 @@ contract NftAuctionTest is Test {
     }
 
     // ============================================================
-    // 升级测试（可选）
+    // 升级测试
     // ============================================================
 
-//    function test_UpgradeContract_Success() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_UpgradeContract_RevertIf_NotAdmin() public {
-//        // TODO: 实现
-//    }
+    function test_UpgradeContract_Success() public {
+        // 1. 升级前先写入状态，验证数据存在
+        _createAuction();
+        assertEq(nftAuction.nextAuctionId(), 1, "nextAuctionId should be 1");
+        assertEq(nftAuction.admin(), admin, "admin mismatch");
+
+        // 2. 部署 V2 逻辑合约
+        NftAuctionV2 v2 = new NftAuctionV2();
+
+        // 3. admin 执行升级
+        vm.prank(admin);
+        nftAuction.upgradeToAndCall(address(v2),"");
+
+        // 4. 验证旧数据保持不变（代理地址不变，存储不变）
+        // 需要用 V2 的接口去访问（但这里 NftAuctionV2 继承自 NftAuction，
+        // 所以 nftAuction 变量仍然可以调用 NftAuction 的方法）
+        assertEq(nftAuction.nextAuctionId(), 1, "nextAuctionId preserved");
+        assertEq(nftAuction.admin(), admin, "admin preserved");
+
+        // 5. 验证新功能可用（将 nftAuction cast 为 V2）
+        NftAuctionV2 v2Proxy = NftAuctionV2(address(nftAuction));
+        assertEq(v2Proxy.test(), 1, "V2 new function should work");
+    }
+
+    function test_UpgradeContract_RevertIf_NotAdmin() public {
+        NftAuctionV2 v2 = new NftAuctionV2();
+
+        // 非 admin（seller）尝试升级
+        vm.prank(seller);
+        vm.expectRevert("Only admin can upgrade");
+        nftAuction.upgradeToAndCall(address(v2),"");
+    }
 
 
 }
