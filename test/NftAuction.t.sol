@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {NftAuctionV2} from "../src/NftAuctionV2.sol";
 import {ERC1967Proxy} from "../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockAggregator} from "./mocks/MockAggregator.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockMyNft} from "./mocks/MockMyNft.sol";
 import {NftAuction} from "../src/NftAuction.sol";
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 
 contract NftAuctionTest is Test {
 
@@ -155,12 +155,12 @@ contract NftAuctionTest is Test {
         nftAuction.placeBid(auctionId, amount, address(token));
     }
 
-    function _approveNFT(address owner, uint256 tokenId) internal {
+    function _approveNft(address owner, uint256 tokenId) internal {
         vm.prank(owner);
         nft.approve(address(nftAuction), tokenId);
     }
 
-    function _revokeNFT(address owner, uint256 tokenId) internal {
+    function _revokeNft(address owner, uint256 tokenId) internal {
         vm.prank(owner);
         nft.approve(address(0), tokenId);
     }
@@ -187,7 +187,7 @@ contract NftAuctionTest is Test {
         vm.prank(seller);
         uint256 auctionId = nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
         // 验证nft转移到了拍卖合约
-        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction));
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "nft not transfer to nftAuction");
         // 验证拍卖id第一个是0
         assertEq(auctionId, 0);
         // 验证映射被记录
@@ -227,7 +227,7 @@ contract NftAuctionTest is Test {
     }
 
     function test_CreateAuction_RevertIf_NotApproved() public {
-        _revokeNFT(seller, TOKEN_ID);
+        _revokeNft(seller, TOKEN_ID);
         vm.prank(seller);
         vm.expectRevert("Marketplace not approved");
         nftAuction.createAuction(address(nft), TOKEN_ID, START_PRICE, 0, DURATION_HOURS);
@@ -268,6 +268,7 @@ contract NftAuctionTest is Test {
         (, int256 _answer, , ,) = ethPriceFeed.latestRoundData();
         // 假设出价1ETH
         uint256 bidAmount = 1 * 10 ** 18;
+        require(_answer > 0, "Price must be positive");
         uint256 highestBid = bidAmount * uint256(_answer) / 10 ** 18;
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer1, highestBid, bidAmount);
@@ -298,6 +299,7 @@ contract NftAuctionTest is Test {
         (, int256 answer, , ,) = usdtPriceFeed.latestRoundData();
         // 假设出价101USDT
         uint256 bidAmount = 101 * 10 ** 6;
+        require(answer > 0, "Price must be positive");
         uint256 highestBid = bidAmount * uint256(answer) / 10 ** 6;
         vm.expectEmit(true, true, true, true);
         emit NewHighestBid(auctionId, buyer2, highestBid, bidAmount);
@@ -586,61 +588,232 @@ contract NftAuctionTest is Test {
         assertEq(token.balanceOf(buyer2), 10000 * 10 ** 6 - 200 * 10 ** 6, "buyer2 ERC20 balance not match");
     }
 
-//    function test_EndAuction_NoBid_NFTReturned() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_EndAuction_RevertIf_NotEnded() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_EndAuction_RevertIf_AlreadyEnded() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_EndAuction_CleansMapping() public {
-//        // TODO: 实现
-//    }
+    function test_EndAuction_NoBid_NFTReturned() public {
+        // 检查初始状态
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+
+        // 创建拍卖
+        uint256 auctionId = _createAuction();
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+        vm.warp(block.timestamp + 25 * 1 hours);
+        nftAuction.endAuction(auctionId);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            NftAuction.Status currentStateNew_,
+            ,
+            ,
+            ,
+        ) = nftAuction.auctions(auctionId);
+        assertEq(uint256(currentStateNew_), uint256(NftAuction.Status.NoBid), "final state mismatch");
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "final nft owner mismatch");
+    }
+
+    function test_EndAuction_RevertIf_NotEnded() public {
+        // 检查初始状态
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+
+        // 创建拍卖
+        uint256 auctionId = _createAuction();
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+        vm.warp(block.timestamp + 22 * 1 hours);
+        vm.expectRevert("Auction not ended");
+        nftAuction.endAuction(auctionId);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            NftAuction.Status currentStateNew_,
+            ,
+            ,
+            ,
+        ) = nftAuction.auctions(auctionId);
+        assertEq(uint256(currentStateNew_), uint256(NftAuction.Status.OnGoing), "final state mismatch");
+    }
+
+    function test_EndAuction_RevertIf_AlreadyEnded() public {
+        // ====== 场景1：有人出价，正常结束后再次调用 ======
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+
+        uint256 auctionId = _createAuction();
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+
+        // 出价
+        vm.warp(block.timestamp + 1);
+        _placeEthBid(auctionId, buyer1, 1 ether);
+
+        // 快进到拍卖结束
+        vm.warp(block.timestamp + 25 * 1 hours);
+
+        // 第一次结束拍卖 - 应该成功
+        nftAuction.endAuction(auctionId);
+
+        // 验证状态已经是 Ended
+        (,,,,,, NftAuction.Status status_,,,,) = nftAuction.auctions(auctionId);
+        assertEq(uint256(status_), uint256(NftAuction.Status.Ended), "status should be Ended");
+
+        // 第二次结束拍卖 - 应该 revert
+        vm.expectRevert("Auction already ended or cancelled");
+        nftAuction.endAuction(auctionId);
+    }
+
+    function test_EndAuction_RevertIf_AlreadyEnded_NoBid() public {
+        // ====== 场景2：无人出价，流拍结束后再次调用 ======
+        uint256 auctionId = _createAuction();
+
+        // 快进到拍卖结束，无人出价
+        vm.warp(block.timestamp + 25 * 1 hours);
+
+        // 第一次结束拍卖 - 流拍
+        nftAuction.endAuction(auctionId);
+
+        // 验证状态是 NoBid
+        (,,,,,, NftAuction.Status status_,,,,) = nftAuction.auctions(auctionId);
+        assertEq(uint256(status_), uint256(NftAuction.Status.NoBid), "status should be NoBid");
+
+        // 第二次结束拍卖 - 应该 revert
+        vm.expectRevert("Auction already ended or cancelled");
+        nftAuction.endAuction(auctionId);
+    }
+
+    function test_EndAuction_CleansMapping() public {
+        // ====== 场景1：有人出价，正常结束后映射被清理 ======
+        uint256 auctionId = _createAuction();
+
+        // 创建后映射应该是 true
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), TOKEN_ID), true, "mapping should be true after create");
+
+        // 出价 + 快进到结束
+        vm.warp(block.timestamp + 1);
+        _placeEthBid(auctionId, buyer1, 1 ether);
+        vm.warp(block.timestamp + 25 * 1 hours);
+
+        // 结束拍卖
+        nftAuction.endAuction(auctionId);
+
+        // 映射应该被清理为 false
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), TOKEN_ID), false, "mapping should be false after end");
+
+        // ====== 场景2：无人出价，流拍后映射被清理 ======
+        // 需要重新铸造一个 NFT（因为上一个已经转给 buyer1 了）
+        vm.prank(seller);
+        uint256 tokenId2 = nft.mint(seller);
+        vm.prank(seller);
+        nft.approve(address(nftAuction), tokenId2);
+
+        uint256 auctionId2 = nftAuction.nextAuctionId();
+        vm.prank(seller);
+        nftAuction.createAuction(address(nft), tokenId2, START_PRICE, 0, DURATION_HOURS);
+
+        // 创建后映射应该是 true
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), tokenId2), true, "mapping should be true after create");
+
+        // 快进到结束（无人出价）
+        vm.warp(block.timestamp + 25 * 1 hours);
+        nftAuction.endAuction(auctionId2);
+
+        // 映射应该被清理为 false
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), tokenId2), false, "mapping should be false after noBid end");
+    }
 
     // ============================================================
     // cancelAuction 测试
     // ============================================================
 
-//    function test_CancelAuction_Success() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CancelAuction_RevertIf_NotSeller() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CancelAuction_RevertIf_AlreadyStarted() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CancelAuction_RevertIf_NotPending() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CancelAuction_CleansMapping() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_CancelAuction_ReturnsNFT() public {
-//        // TODO: 实现
-//    }
+    function test_CancelAuction_Success() public {
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+        uint256 auctionId = _createAuction(START_PRICE, 2, DURATION_HOURS);
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+        vm.prank(seller);
+        nftAuction.cancelAuction(auctionId);
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), TOKEN_ID), false, "mapping should be false after cancelAuction success end");
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner should be seller after cancelAuction success end");
+    }
+
+    function test_CancelAuction_RevertIf_NotSeller() public {
+        uint256 auctionId = _createAuction(START_PRICE, 2, DURATION_HOURS);
+        vm.expectRevert("Only seller");
+        vm.prank(buyer1);
+        nftAuction.cancelAuction(auctionId);
+    }
+
+    function test_CancelAuction_RevertIf_AlreadyStarted() public {
+        uint256 auctionId = _createAuction(START_PRICE, 2, DURATION_HOURS);
+        vm.prank(seller);
+        vm.expectRevert("Already started");
+        vm.warp(block.timestamp + 3 * 1 hours);
+        nftAuction.cancelAuction(auctionId);
+    }
+
+    function test_CancelAuction_RevertIf_NotPending() public {
+        uint256 auctionId = _createAuction(START_PRICE, 0, DURATION_HOURS);
+        vm.prank(seller);
+        vm.expectRevert("Must be Pending");
+        nftAuction.cancelAuction(auctionId);
+    }
+
+    function test_CancelAuction_CleansMapping() public {
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+        uint256 auctionId = _createAuction(START_PRICE, 2, DURATION_HOURS);
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "after createAuction nft owner mismatch");
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), TOKEN_ID), true, "after createAuction mapping should be true");
+        vm.prank(seller);
+        nftAuction.cancelAuction(auctionId);
+        assertEq(nftAuction.nftToken2AuctionId(address(nft), TOKEN_ID), false, "mapping should be false after cancelAuction success end");
+    }
+
+    function test_CancelAuction_ReturnsNFT() public {
+        assertEq(nft.ownerOf(TOKEN_ID), seller, "nft owner mismatch");
+        uint256 auctionId = _createAuction(START_PRICE, 2, DURATION_HOURS);
+        assertEq(nft.ownerOf(TOKEN_ID), address(nftAuction), "nft ownerOf should be nftAuction after createAuction");
+        vm.prank(seller);
+        nftAuction.cancelAuction(auctionId);
+        assertEq(nft.ownerOf(TOKEN_ID), address(seller), "nft ownerOf should be seller after cancelAuction success end");
+    }
 
     // ============================================================
-    // 升级测试（可选）
+    // 升级测试
     // ============================================================
 
-//    function test_UpgradeContract_Success() public {
-//        // TODO: 实现
-//    }
-//
-//    function test_UpgradeContract_RevertIf_NotAdmin() public {
-//        // TODO: 实现
-//    }
+    function test_UpgradeContract_Success() public {
+        // 1. 升级前先写入状态，验证数据存在
+        _createAuction();
+        assertEq(nftAuction.nextAuctionId(), 1, "nextAuctionId should be 1");
+        assertEq(nftAuction.admin(), admin, "admin mismatch");
+
+        // 2. 部署 V2 逻辑合约
+        NftAuctionV2 v2 = new NftAuctionV2();
+
+        // 3. admin 执行升级
+        vm.prank(admin);
+        nftAuction.upgradeToAndCall(address(v2),"");
+
+        // 4. 验证旧数据保持不变（代理地址不变，存储不变）
+        // 需要用 V2 的接口去访问（但这里 NftAuctionV2 继承自 NftAuction，
+        // 所以 nftAuction 变量仍然可以调用 NftAuction 的方法）
+        assertEq(nftAuction.nextAuctionId(), 1, "nextAuctionId preserved");
+        assertEq(nftAuction.admin(), admin, "admin preserved");
+
+        // 5. 验证新功能可用（将 nftAuction cast 为 V2）
+        NftAuctionV2 v2Proxy = NftAuctionV2(address(nftAuction));
+        assertEq(v2Proxy.test(), 1, "V2 new function should work");
+    }
+
+    function test_UpgradeContract_RevertIf_NotAdmin() public {
+        NftAuctionV2 v2 = new NftAuctionV2();
+
+        // 非 admin（seller）尝试升级
+        vm.prank(seller);
+        vm.expectRevert("Only admin can upgrade");
+        nftAuction.upgradeToAndCall(address(v2),"");
+    }
 
 
 }
