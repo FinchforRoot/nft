@@ -54,4 +54,4 @@ function test_SomeFunction() public {
 
 12.测试报告：提交测试报告，包括测试覆盖率和测试结果  这个怎么获取，我看到需要lcov.info文件，这个是需要用什么工具打开？针对测试覆盖率我只知道使用forge coverage命令，但是它只是输出了结果到控制台
 
-13.
+13.本地的.env文件中有了秘钥，但是forge script script/NftAuction.s.sol --rpc-url sepolia --broadcast --private-key $PRIVATE_KEY执行的时候还是没有获取到PRIVATE_KEY，所以正常情况是我必须在控制台先export私钥，然后才可以执行命令吗？我还以为在.env写好了，敲击命令的时候就是自动的了。
