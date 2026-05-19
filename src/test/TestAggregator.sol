@@ -2,13 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {AggregatorV3Interface} from "chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TestAggregator is AggregatorV3Interface {
+contract TestAggregator is AggregatorV3Interface,Ownable {
 
     int256 public answer;
 
     // 根据传入的answer初始化，直接定死返回的价格对照结果，例如1btc = 10000usd
-    constructor(int256 _answer) {
+    constructor(int256 _answer) Ownable(msg.sender) {
         answer = _answer;
     }
 
@@ -35,7 +36,7 @@ contract TestAggregator is AggregatorV3Interface {
         return (0, answer, 0, 0, 0);
     }
 
-    function setPrice(int256 _answer) public {
+    function setPrice(int256 _answer) public onlyOwner {
         answer = _answer;
     }
 

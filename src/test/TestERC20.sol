@@ -2,12 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TestERC20 is ERC20 {
+contract TestERC20 is ERC20,Ownable {
 
-    constructor() ERC20("USDT", "USDT") {}
+    constructor() ERC20("USDT", "USDT") Ownable(msg.sender) {}
 
-    function mint(address to, uint256 amount) external {
+    function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
 
