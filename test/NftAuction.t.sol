@@ -62,7 +62,7 @@ contract NftAuctionTest is Test {
         // 1.部署价格预言机：ETH $2318.12, USDT $1.00
         ethPriceFeed = new MockAggregator(ETH_PRICE);
         usdtPriceFeed = new MockAggregator(USDT_PRICE);
-        // 2. 部署 MockERC20 和 MockERC721
+        // 2. 部署 TestERC20.sol 和 MockERC721
         token = new MockERC20();
         nft = new MockMyNft();
 
