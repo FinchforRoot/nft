@@ -373,7 +373,7 @@ contract NftAuctionTest is Test {
             uint256 firstHighestBid_,
             address firstHighestBidder_,
             uint256 firstHighestBidAmount_,
-            address firstTokenAddress_
+
         ) = nftAuction.auctions(auctionId);
         uint256 firstHighestBid = 1 ether * uint256(_answer) / 10 ** 18;
         assertEq(buyer1.balance, 99 ether, "buyer1 balance mismatch");
@@ -394,7 +394,7 @@ contract NftAuctionTest is Test {
             uint256 secondHighestBid_,
             address secondHighestBidder_,
             uint256 secondHighestBidAmount_,
-            address secondTokenAddress_
+
         ) = nftAuction.auctions(auctionId);
         uint256 secondHighestBid = 2 ether * uint256(_answer) / 10 ** 18;
         assertEq(buyer1.balance, 100 ether, "buyer1 balance mismatch");
