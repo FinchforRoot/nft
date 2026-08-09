@@ -8,6 +8,7 @@ import {ERC1967Proxy} from "../lib/openzeppelin-contracts-upgradeable/lib/openze
 import {TestAggregator} from "../src/test/TestAggregator.sol";
 import {TestERC20} from "../src/test/TestERC20.sol";
 import {TestMyNft} from "../src/test/TestMyNft.sol";
+import {NftAuctionV3} from "../src/NftAuctionV3.sol";
 
 contract NftAuctionScript is Script {
     NftAuction public implementation;
@@ -51,14 +52,14 @@ contract NftAuctionScript is Script {
         console.log("ERC1967Proxy deployed at:", address(proxy));
 
         // 8. 通过代理合约地址来使用
-        NftAuction nftAuction = NftAuction(address(proxy));
+        NftAuctionV3 nftAuction3 = NftAuctionV3(address(proxy));
 
         // 9. 注册 ETH/USD 喂价合约 (address(0) 代表 ETH)
-        nftAuction.setPriceFeed(address(0), address(ethUsdAggregator));
+        nftAuction3.setPriceFeed(address(0), address(ethUsdAggregator));
         console.log("ETH/USD Price Feed registered:", address(ethUsdAggregator));
 
         // 10. 注册 USDT/USD 喂价合约
-        nftAuction.setPriceFeed(address(usdt), address(usdtUsdAggregator));
+        nftAuction3.setPriceFeed(address(usdt), address(usdtUsdAggregator));
         console.log("USDT/USD Price Feed registered:", address(usdtUsdAggregator));
 
         // 11. Mint 测试代币给部署者 (1000 USDT)
