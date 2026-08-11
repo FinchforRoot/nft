@@ -15,31 +15,24 @@ Nomic Foundation
 
 
 最新部署地址
-== Logs ==
-ETH/USD Aggregator deployed at: 0xbA62C5de7aa2eFd6b2FEAa72562D95678Ce97D93
-USDT/USD Aggregator deployed at: 0xed93426dA94D27dCfd3e3949D051882Ccae31614
-USDT deployed at: 0xfFdb5E3F6832350847Af88088f682746c441a830
-TestMyNft deployed at: 0x626dBa4aE86F0ca323A89A5FBaac53db59a79737
-NftAuction Implementation deployed at: 0x241999f052ab292Aaf1f89b1C2AD5EDc80110609
-ERC1967Proxy deployed at: 0xF3E4794B7a5a766d7675955c127831eA28Fa80C8
-ETH/USD Price Feed registered: 0xbA62C5de7aa2eFd6b2FEAa72562D95678Ce97D93
-USDT/USD Price Feed registered: 0xed93426dA94D27dCfd3e3949D051882Ccae31614
-Minted 1000 USDT to deployer: 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-Minted NFT tokenId 0 to deployer: 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-===================================
-Deployment Summary:
-ETH/USD Aggregator: 0xbA62C5de7aa2eFd6b2FEAa72562D95678Ce97D93
-USDT/USD Aggregator: 0xed93426dA94D27dCfd3e3949D051882Ccae31614
-USDT Token: 0xfFdb5E3F6832350847Af88088f682746c441a830
-TestMyNft: 0x626dBa4aE86F0ca323A89A5FBaac53db59a79737
-NftAuction Implementation: 0x241999f052ab292Aaf1f89b1C2AD5EDc80110609
-NftAuction Proxy: 0xF3E4794B7a5a766d7675955c127831eA28Fa80C8
-Deployer: 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-===================================
+```text
+  Deployment Summary:
+  ETH/USD Aggregator: 0x47b61E8BD84A71636f946395eC0c06Cb469e0047
+  USDT/USD Aggregator: 0x4aC70c2877b433b7E9F05ea8B1d51866536cA481
+  USDT Token: 0x5E2e299edCd1b083b858bFbC49944C277ebf1D00
+  TestMyNft: 0x5541f9f7E689f6EE712Fc46A934b90A36E79A2fD
+  NftAuction Implementation: 0x261DCc31A34524c28F0D9078dD375f1024678959
+  NftAuction Proxy: 0xa1EaE6652e6CBCbc70048196B105904ED385F058
+  Deployer: 0x2b03639904180eFaf22DdC811F4B878b85e1406E
+
+```
 
 部署命令
 ```text
 forge build
-forge script script/NftAuction.s.sol --rpc-url $SEPOLIA_RPC_URL --account deployer1 --broadcast
+forge script script/NftAuction.s.sol --rpc-url $SEPOLIA_RPC_URL --account deployer1 --sender 账户地址 --broadcast
 这里的deployer1是自己本地账户起的别名，用cast wallet import deployer1 --interactive命令创建的，相当于--private-key $PRIVATE_KEY
+这里有个大坑：
+forge script script/NftAuction.s.sol --rpc-url $SEPOLIA_RPC_URL --account deployer1 --broadcast
+不加--sender 的话  无法解析--account到msg.sender
 ```

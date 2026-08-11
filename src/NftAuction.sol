@@ -83,7 +83,8 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
         uint256 indexed auctionId,  // 拍卖品id
         address indexed bidder, // 拍卖者地址
         uint256 bid,    // 出价金额【美元】
-        uint256 bidAmount // 代币数量【ETH/ERC20】
+        uint256 bidAmount, // 代币数量【ETH/ERC20】,
+        address tokenAddress
     );
 
     function initialize() public initializer {
@@ -96,7 +97,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
     }
 
     /**
-     * 
+     *
      * @dev 查询指定代币的最新链上价格
      * @param _tokenAddress 要查询价格的代币合约地址（例如 USDT 的合约地址，或 ETH 用 address(0) 表示）
      * @notice 根据传入的代币地址，从对应的 Chainlink 喂价合约中获取最新的链上价格
@@ -279,7 +280,7 @@ contract NftAuction is Initializable, UUPSUpgradeable, ReentrancyGuard {
             }
         }
 
-        emit NewHighestBid(_auctionId, msg.sender, payValue, _bidAmount);
+        emit NewHighestBid(_auctionId, msg.sender, payValue, _bidAmount,_tokenAddress);
 
     }
 
