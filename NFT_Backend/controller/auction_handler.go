@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// AuctionHandler 参考 lesson-03 的 UserHandler：struct 持有 service，构造器注入。
+// AuctionHandler
 type AuctionHandler struct {
 	svc *service.AuctionQueryService
 }

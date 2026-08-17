@@ -19,16 +19,18 @@ import (
 	"gorm.io/gorm"
 )
 
-/* 连数据库 → 连链 → 读 checkpoint
-   → 哈希对不上？清三张表，从头同步
-   → 哈希对得上？从 next_block 接着同步
-   → 拉 logs → 一个事务里：存事件 → 投影 → 推 checkpoint
-   → 结束
+/*
+连数据库 → 连链 → 读 checkpoint
+
+	→ 哈希对不上 清三张表，从头同步
+	→ 哈希对得上 从 next_block 接着同步
+	→ 拉 logs → 一个事务里：存事件 → 投影 → 推 checkpoint
+	→ 结束
 */
 func main() {
 	db, err := config.NewMySQLDB()
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("执行构造数据库对象时发生了error %s", err))
 	}
 	if err := db.AutoMigrate(
 		&model.Auction{},
@@ -41,45 +43,45 @@ func main() {
 	println("migrate done")
 	client, err := chain.NewRPCClient(os.Getenv("SEPOLIA_RPC_URL"))
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("执行初始化RPC时发生了error %s", err))
 	}
 	chainIdBig, err := client.ChainID(context.Background())
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("通过Client获取chainId时发生了error %s", err))
 	}
 	chainId := chainIdBig.Uint64()
 	proxy_address := os.Getenv("AUCTION_PROXY_ADDRESS")
-
+	start, err := strconv.ParseInt(os.Getenv("CONTRACT_BLOCK_NUMBER"), 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("加载CONTRACT_BLOCK_NUMBER环境变量时发生了error %s", err))
+	}
 	go func() {
 		// 先立刻跑一次，然后每30秒监听一次
-		startWatcher(db, client, proxy_address, chainId)
+		startWatcher(db, client, proxy_address, start, chainId)
 		ticker := time.NewTicker(30 * time.Second)
 		for range ticker.C {
-			startWatcher(db, client, proxy_address, chainId)
+			startWatcher(db, client, proxy_address, start, chainId)
 		}
 	}()
 	auctionService := service.NewAuctionQueryService(db, chainId, proxy_address)
 	r := controller.NewRouter(auctionService)
 	if err := r.Run(":8080"); err != nil {
-		panic(err)
+		panic(fmt.Errorf("启动HTTP服务时发生了error %s", err))
 	}
 }
 
-func startWatcher(db *gorm.DB, client *ethclient.Client, proxy_address string, chainId uint64) {
+func startWatcher(db *gorm.DB, client *ethclient.Client, proxy_address string, start int64, chainId uint64) {
 	header, err := client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
-		panic(err)
+		fmt.Println("获取到最新区块头信息失败，本轮跳过:", err)
+		return
 	}
 	fmt.Println("sepolia 当前区块：", header.Number)
 	// 查同步进度：查不到（ErrRecordNotFound）= 首次运行，属正常情况，放行
 	checkpoint, err := repository.FindCheckpoint(db, chainId, proxy_address)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		panic(err)
-	}
-	// 首次：从部署区块（环境变量）全量拉；有进度：从 next_block 增量拉
-	start, err := strconv.ParseInt(os.Getenv("CONTRACT_BLOCK_NUMBER"), 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("CONTRACT_BLOCK_NUMBER not set: %v", err))
+		fmt.Println("没查到记录最新拉取区块信息的记录，本轮跳过:", err)
+		return
 	}
 	if checkpoint != nil {
 		lastHeader, err := client.HeaderByNumber(context.Background(), big.NewInt(int64(checkpoint.LastProcessedBlock)))
@@ -117,7 +119,8 @@ func startWatcher(db *gorm.DB, client *ethclient.Client, proxy_address string, c
 	}
 	logs, err := chain.FetchAuctionLogs(client, proxy_address, start, end, 2000)
 	if err != nil {
-		panic(err)
+		fmt.Println("获取链上日志失败:", err)
+		return
 	}
 	fmt.Println("日志总数：", len(logs))
 	parseABI := chain.MustLoadNftAuctionABI()
@@ -127,7 +130,7 @@ func startWatcher(db *gorm.DB, client *ethclient.Client, proxy_address string, c
 		for _, l := range logs {
 			name, fields, err := chain.DecodeLogs(parseABI, l)
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println("解析链上日志失败：", err)
 				continue
 			}
 			bt, ok := blockTimeCache[l.BlockNumber]
